@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LWM Tower Defense</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* Basic page styling */
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #1a1a1a;
+            color: #fff;
+            font-family: 'Press Start 2P', cursive;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        /* Main game container */
+        #game-container {
+            display: flex;
+            flex-direction: row; /* Align game and menu side-by-side */
+            align-items: flex-start;
+            gap: 20px;
+            flex-wrap: wrap; /* Allow wrapping on smaller screens */
+            justify-content: center;
+        }
+        
+        #game-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        /* Game canvas styling */
+        canvas {
+            border: 4px solid #444;
+            background-color: #2a2a2a;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* UI panel for stats */
+        #ui-panel {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            max-width: 800px; /* Adjust as needed for wider canvas */
+            background: #222;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #444;
+            box-shadow: inset 0 0 10px #000;
+        }
+
+        /* Individual stat display */
+        .stat {
+            font-size: 1em;
+            text-shadow: 2px 2px #000;
+        }
+        
+        .stat-value {
+            color: #00ff00; /* Bright green for values */
+        }
+
+        /* Tower selection menu */
+        #tower-menu {
+            width: 200px;
+            background: #222;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #444;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #tower-menu h2 {
+            font-size: 1.1em;
+            text-align: center;
+            margin-top: 0;
+            margin-bottom: 10px;
+            text-decoration: underline;
+        }
+
+        .tower-button {
+            background-color: #4CAF50;
+            border: 2px solid #333;
+            color: white;
+            padding: 10px;
+            text-align: left;
+            text-decoration: none;
+            display: block;
+            font-size: 14px;
+            font-family: 'Press Start 2P', cursive;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s, box-shadow 0.3s;
+        }
+
+        .tower-button:hover {
+            background-color: #45a049;
+        }
+
+        .tower-button.selected {
+            background-color: #00aaff;
+            box-shadow: 0 0 15px #00aaff;
+        }
+
+        .tower-button .cost {
+            font-weight: bold;
+            color: #ffeb3b;
+        }
+
+        /* Game controls */
+        #game-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .control-button {
+            background-color: #007bff;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            font-family: 'Press Start 2P', cursive;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .control-button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Tower Defense</h1>
+    <div id="game-container">
+        <div id="game-area">
+            <canvas id="gameCanvas" width="1200" height="800"></canvas>
+            <div id="ui-panel">
+                <div class="stat">Money: <span id="money" class="stat-value">100</span></div>
+                <div class="stat">Score: <span id="score" class="stat-value">0</span></div>
+                <div class="stat">Lives: <span id="lives" class="stat-value">10</span></div>
+                <div class="stat">Wave: <span id="wave" class="stat-value">0</span></div>
+            </div>
+            <div id="game-controls">
+                <button id="pause-start-btn" class="control-button">Pause</button>
+                <button id="speed-toggle-btn" class="control-button">Speed: 1x</button>
+            </div>
+        </div>
+
+        <div id="tower-menu">
+            <h2>Towers</h2>
+            <button id="basic-tower-btn" class="tower-button selected">
+                <div>Machine Gun</div>
+                <div class="cost">Cost: 50</div>
+                <div>Fast, low damage.</div>
+            </button>
+            <button id="cannon-tower-btn" class="tower-button">
+                <div>Cannon</div>
+                <div class="cost">Cost: 100</div>
+                <div class="description">Slow, high damage.</div>
+            </button>
+            <button id="ice-tower-btn" class="tower-button">
+                <div>Ice Tower</div>
+                <div class="cost">Cost: 75</div>
+                <div class="description">Freezes enemies.</div>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- Canvas and Context Setup ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- Game State Variables ---
+        let money = 200; // Changed starting money to 200
+        let score = 0;
+        let lives = 10;
+        let wave = 0;
+        let enemies = [];
+        let towers = [];
+        let projectiles = [];
+        let gameOver = false;
+        let waveInProgress = false;
+        let isPaused = false;
+        let gameSpeed = 1; // 1x or 2x
+        const GRID_SIZE = 25; // Significantly smaller grid size
+        let selectedTowerType = 'basic'; // Default selected tower
+        let animationFrameId; // To store the requestAnimationFrame ID
+
+        // --- Tower Definitions ---
+        // Range, damage, and fireRate are adjusted based on the smaller GRID_SIZE for balance
+        const TOWER_TYPES = {
+            'basic': { cost: 50, damage: 15, fireRate: 30, range: 5 * GRID_SIZE, color: '#00aaff', projectileColor: '#ffff00', description: 'Fast, low damage.' },
+            'cannon': { cost: 100, damage: 50, fireRate: 90, range: 7 * GRID_SIZE, color: '#ff8c00', projectileColor: '#ff4500', description: 'Slow, high damage.' },
+            'ice': { cost: 75, damage: 0, fireRate: 60, range: 4 * GRID_SIZE, color: '#87cefa', projectileColor: '#e0ffff', description: 'Slows enemies.' }
+        };
+
+        // --- Enemy Definitions ---
+        // Health and speed adjusted for the new scale and longer path
+        const ENEMY_TYPES = {
+            'normal': { health: 50, speed: 0.8, color: 'hsl(0, 80%, 50%)', reward: 5, score: 50 },
+            'fast': { health: 30, speed: 1.5, color: 'hsl(120, 80%, 40%)', reward: 8, score: 75 },
+            'tank': { health: 150, speed: 0.4, color: 'hsl(240, 60%, 50%)', reward: 15, score: 125 }
+        };
+
+        // --- UI Element References ---
+        const moneyDisplay = document.getElementById('money');
+        const scoreDisplay = document.getElementById('score');
+        const livesDisplay = document.getElementById('lives');
+        const waveDisplay = document.getElementById('wave');
+        const basicTowerBtn = document.getElementById('basic-tower-btn');
+        const cannonTowerBtn = document.getElementById('cannon-tower-btn');
+        const iceTowerBtn = document.getElementById('ice-tower-btn');
+        const pauseStartBtn = document.getElementById('pause-start-btn');
+        const speedToggleBtn = document.getElementById('speed-toggle-btn');
+
+
+        // --- Enemy Path Definition (Longer and more complex path for 1200x800 canvas) ---
+        // Remember (0,0) is top-left
+        const path = [
+            { x: 0 * GRID_SIZE, y: 10 * GRID_SIZE }, // Start left-middle
+            { x: 5 * GRID_SIZE, y: 10 * GRID_SIZE },
+            { x: 5 * GRID_SIZE, y: 3 * GRID_SIZE },
+            { x: 10 * GRID_SIZE, y: 3 * GRID_SIZE },
+            { x: 10 * GRID_SIZE, y: 15 * GRID_SIZE },
+            { x: 2 * GRID_SIZE, y: 15 * GRID_SIZE },
+            { x: 2 * GRID_SIZE, y: 25 * GRID_SIZE }, // Down to almost bottom
+            { x: 15 * GRID_SIZE, y: 25 * GRID_SIZE },
+            { x: 15 * GRID_SIZE, y: 5 * GRID_SIZE },
+            { x: 25 * GRID_SIZE, y: 5 * GRID_SIZE },
+            { x: 25 * GRID_SIZE, y: 20 * GRID_SIZE },
+            { x: 35 * GRID_SIZE, y: 20 * GRID_SIZE }, // End right-middle
+            { x: 35 * GRID_SIZE, y: 10 * GRID_SIZE },
+            { x: 48 * GRID_SIZE, y: 10 * GRID_SIZE } // Exit off right side
+        ];
+
+
+        // --- Game Object Classes ---
+
+        class Tower {
+            constructor(x, y, type) {
+                const stats = TOWER_TYPES[type];
+                this.x = x;
+                this.y = y;
+                this.type = type;
+                this.width = GRID_SIZE;
+                this.height = GRID_SIZE;
+                this.range = stats.range;
+                this.fireRate = stats.fireRate;
+                this.damage = stats.damage;
+                this.color = stats.color;
+                this.projectileColor = stats.projectileColor;
+                this.fireCooldown = 0;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                ctx.strokeStyle = '#333';
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
+                ctx.beginPath();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.range, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            update() {
+                if (this.fireCooldown > 0) {
+                    this.fireCooldown -= gameSpeed;
+                }
+
+                const target = enemies.find(enemy => {
+                    const dx = enemy.x - (this.x + this.width / 2);
+                    const dy = enemy.y - (this.y + this.height / 2);
+                    return Math.sqrt(dx * dx + dy * dy) < this.range;
+                });
+
+                if (target && this.fireCooldown <= 0) {
+                    if (this.type === 'ice') {
+                        // Ice tower doesn't shoot projectiles, it applies a debuff
+                        target.applySlow(180); // Slow for 3 seconds (60 frames/sec * 3)
+                        this.fireCooldown = this.fireRate;
+                    } else {
+                        projectiles.push(new Projectile(this.x + this.width / 2, this.y + this.height / 2, target, this.damage, this.projectileColor));
+                        this.fireCooldown = this.fireRate;
+                    }
+                }
+            }
+        }
+
+        class Enemy {
+            constructor(type) {
+                const stats = ENEMY_TYPES[type];
+                this.x = path[0].x;
+                this.y = path[0].y;
+                this.width = GRID_SIZE * 0.8; // Scale enemy size with GRID_SIZE
+                this.height = GRID_SIZE * 0.8; // Scale enemy size with GRID_SIZE
+                this.type = type;
+                this.speed = stats.speed;
+                this.health = stats.health;
+                this.maxHealth = stats.health;
+                this.color = stats.color;
+                this.reward = stats.reward;
+                this.score = stats.score;
+                this.pathIndex = 0;
+                this.slowTimer = 0;
+                this.currentSpeed = this.speed;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+                
+                // Health bar
+                const healthBarWidth = this.width * (this.health / this.maxHealth);
+                ctx.fillStyle = '#333';
+                ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 10, this.width, 5);
+                ctx.fillStyle = '#00ff00';
+                ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 10, healthBarWidth, 5);
+
+                // Slow effect indicator
+                if (this.slowTimer > 0) {
+                    ctx.fillStyle = 'rgba(135, 206, 250, 0.7)'; // Light blue for slow
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.width / 2 + 5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            update() {
+                if (this.slowTimer > 0) {
+                    this.slowTimer -= gameSpeed;
+                    this.currentSpeed = this.speed * 0.5; // Half speed when slowed
+                } else {
+                    this.currentSpeed = this.speed;
+                }
+
+                if (this.pathIndex >= path.length - 1) {
+                    lives--;
+                    const enemyIndex = enemies.indexOf(this);
+                    if (enemyIndex > -1) enemies.splice(enemyIndex, 1);
+                    return;
+                }
+                const targetPoint = path[this.pathIndex + 1];
+                const dx = targetPoint.x - this.x;
+                const dy = targetPoint.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < this.currentSpeed * gameSpeed) {
+                    this.pathIndex++;
+                } else {
+                    this.x += (dx / distance) * this.currentSpeed * gameSpeed;
+                    this.y += (dy / distance) * this.currentSpeed * gameSpeed;
+                }
+            }
+
+            applySlow(duration) {
+                this.slowTimer = duration;
+            }
+        }
+
+        class Projectile {
+            constructor(x, y, target, damage, color) {
+                this.x = x;
+                this.y = y;
+                this.target = target;
+                this.speed = 10; // Adjusted projectile speed for smaller scale
+                this.damage = damage;
+                this.radius = 3; // Smaller projectile radius
+                this.color = color;
+                this.hit = false; // Flag to check if it has hit
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            update() {
+                if (!this.target || this.target.health <= 0) {
+                    // If target is gone, remove projectile
+                    this.hit = true; 
+                    return;
+                }
+
+                const dx = this.target.x - this.x;
+                const dy = this.target.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < this.speed * gameSpeed) {
+                    this.x = this.target.x;
+                    this.y = this.target.y;
+                    this.hit = true;
+                } else {
+                    this.x += (dx / distance) * this.speed * gameSpeed;
+                    this.y += (dy / distance) * this.speed * gameSpeed;
+                }
+            }
+        }
+
+        // --- Core Game Logic Functions ---
+
+        function spawnWave() {
+            wave++;
+            waveInProgress = true;
+            const enemyCounts = { 'normal': 0, 'fast': 0, 'tank': 0 };
+
+            // Adjust enemy composition based on wave number
+            if (wave <= 3) {
+                enemyCounts.normal = wave * 8; // More enemies due to longer track
+            } else if (wave <= 7) {
+                enemyCounts.normal = 20 + (wave - 3) * 3;
+                enemyCounts.fast = (wave - 3) * 3;
+            } else {
+                enemyCounts.normal = 30 + (wave - 7) * 2;
+                enemyCounts.fast = 15 + (wave - 7) * 3;
+                enemyCounts.tank = Math.floor((wave - 7) / 1.5); // Tanks appear more frequently
+            }
+
+            let spawnDelay = 0;
+            for (const type in enemyCounts) {
+                for (let i = 0; i < enemyCounts[type]; i++) {
+                    setTimeout(() => {
+                        enemies.push(new Enemy(type));
+                    }, spawnDelay);
+                    spawnDelay += 400; // Shorter delay between enemy spawns for longer waves
+                }
+            }
+        }
+
+        function drawPath() {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = GRID_SIZE; // Path width scales with GRID_SIZE
+            ctx.beginPath();
+            ctx.moveTo(path[0].x, path[0].y);
+            for (let i = 1; i < path.length; i++) {
+                ctx.lineTo(path[i].x, path[i].y);
+            }
+            ctx.stroke();
+            ctx.lineWidth = 1; // Reset line width
+        }
+
+        function handleCollisions() {
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const p = projectiles[i];
+                if (p.hit) {
+                    if (p.target && p.target.health > 0) { // Ensure target still exists and is alive
+                        p.target.health -= p.damage;
+                        if (p.target.health <= 0) {
+                            const enemyIndex = enemies.indexOf(p.target);
+                            if (enemyIndex > -1) {
+                                enemies.splice(enemyIndex, 1);
+                                money += ENEMY_TYPES[p.target.type].reward;
+                                score += ENEMY_TYPES[p.target.type].score;
+                            }
+                        }
+                    }
+                    projectiles.splice(i, 1);
+                }
+            }
+        }
+
+        function updateUI() {
+            moneyDisplay.textContent = money;
+            scoreDisplay.textContent = score;
+            livesDisplay.textContent = lives;
+            waveDisplay.textContent = wave;
+        }
+
+        function isValidPlacement(snappedX, snappedY) {
+            // Check if coordinates overlap with existing towers
+            for (const tower of towers) {
+                if (tower.x === snappedX && tower.y === snappedY) {
+                    return false;
+                }
+            }
+
+            // Check if coordinates overlap with the path
+            // This checks if the center of the snapped square (or any part) is too close to the path segment
+            // A more robust check might involve line-segment to rectangle intersection
+            for(let i = 0; i < path.length - 1; i++) {
+                const p1 = path[i];
+                const p2 = path[i+1];
+
+                // Approximate bounding box for the path segment
+                const pathMinX = Math.min(p1.x, p2.x) - GRID_SIZE / 2;
+                const pathMaxX = Math.max(p1.x, p2.x) + GRID_SIZE / 2;
+                const pathMinY = Math.min(p1.y, p2.y) - GRID_SIZE / 2;
+                const pathMaxY = Math.max(p1.y, p2.y) + GRID_SIZE / 2;
+
+                // Check if the tower's square (snappedX, snappedY, GRID_SIZE, GRID_SIZE) overlaps with the path's approximate bounding box
+                if (snappedX < pathMaxX && snappedX + GRID_SIZE > pathMinX &&
+                    snappedY < pathMaxY && snappedY + GRID_SIZE > pathMinY) {
+                    return false; // Overlaps with path
+                }
+            }
+            // Also ensure tower is within canvas bounds
+            if (snappedX < 0 || snappedX + GRID_SIZE > canvas.width ||
+                snappedY < 0 || snappedY + GRID_SIZE > canvas.height) {
+                return false;
+            }
+
+            return true;
+        }
+
+        function placeTower(event) {
+            if (gameOver || isPaused) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            const snappedX = Math.floor(x / GRID_SIZE) * GRID_SIZE;
+            const snappedY = Math.floor(y / GRID_SIZE) * GRID_SIZE;
+            const towerInfo = TOWER_TYPES[selectedTowerType];
+
+            if (money < towerInfo.cost) {
+                console.log("Not enough money!");
+                return;
+            }
+            
+            if (!isValidPlacement(snappedX, snappedY)) {
+                console.log("Cannot place a tower here!");
+                return;
+            }
+
+            towers.push(new Tower(snappedX, snappedY, selectedTowerType));
+            money -= towerInfo.cost;
+        }
+
+        function endGame() {
+            gameOver = true;
+            cancelAnimationFrame(animationFrameId); // Stop the game loop
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.font = '40px "Press Start 2P"';
+            ctx.textAlign = 'center';
+            ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 30);
+            ctx.font = '20px "Press Start 2P"';
+            ctx.fillText(`Final Score: ${score}`, canvas.width / 2, canvas.height / 2 + 20);
+            ctx.fillText('Refresh to Play Again', canvas.width / 2, canvas.height / 2 + 60);
+        }
+
+        function gameLoop() {
+            if (gameOver) return;
+
+            if (!isPaused) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                drawPath();
+
+                // Update and draw game objects
+                towers.forEach(tower => { tower.update(); tower.draw(); });
+                enemies.forEach(enemy => { enemy.update(); enemy.draw(); });
+                projectiles.forEach(p => { p.update(); p.draw(); });
+                
+                handleCollisions();
+                updateUI();
+
+                if (lives <= 0) {
+                    endGame();
+                }
+
+                // Wave management
+                if (waveInProgress && enemies.length === 0) {
+                    waveInProgress = false;
+                }
+                if (!waveInProgress && enemies.length === 0) { // Only spawn next wave if current wave is cleared
+                    spawnWave();
+                }
+            }
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // --- Event Listeners ---
+        canvas.addEventListener('click', placeTower);
+
+        basicTowerBtn.addEventListener('click', () => {
+            selectedTowerType = 'basic';
+            basicTowerBtn.classList.add('selected');
+            cannonTowerBtn.classList.remove('selected');
+            iceTowerBtn.classList.remove('selected');
+        });
+
+        cannonTowerBtn.addEventListener('click', () => {
+            selectedTowerType = 'cannon';
+            cannonTowerBtn.classList.add('selected');
+            basicTowerBtn.classList.remove('selected');
+            iceTowerBtn.classList.remove('selected');
+        });
+
+        iceTowerBtn.addEventListener('click', () => {
+            selectedTowerType = 'ice';
+            iceTowerBtn.classList.add('selected');
+            basicTowerBtn.classList.remove('selected');
+            cannonTowerBtn.classList.remove('selected');
+        });
+
+        pauseStartBtn.addEventListener('click', () => {
+            isPaused = !isPaused;
+            pauseStartBtn.textContent = isPaused ? 'Start' : 'Pause';
+            if (!isPaused && !gameOver) {
+                gameLoop(); // Resume the loop if not paused and not game over
+            } else if (isPaused) {
+                cancelAnimationFrame(animationFrameId); // Pause the loop
+            }
+        });
+
+        speedToggleBtn.addEventListener('click', () => {
+            gameSpeed = (gameSpeed === 1) ? 2 : 1;
+            speedToggleBtn.textContent = `Speed: ${gameSpeed}x`;
+        });
+
+        // --- Start the Game ---
+        gameLoop();
+    </script>
+</body>
+</html>
